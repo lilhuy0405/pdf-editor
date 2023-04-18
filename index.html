@@ -20,7 +20,7 @@
 
       async function loadPdf() {
         // Fetch an existing PDF document.
-        const url = "./demo.pdf";
+        const url = "/demo.pdf";
         const existingPdfBytes = await fetch(url).then((res) =>
           res.arrayBuffer()
         );
