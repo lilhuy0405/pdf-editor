@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib"></script>
+    <script src="https://unpkg.com/downloadjs@1.4.7"></script>
+    <title>Vite App</title>
+  </head>
+  <body>
+    <div>
+    </div>
+    <iframe id="pdf" style="width: 90%; height: 700px"></iframe>
+    <!-- <script type="module" src="/main.js"></script> -->
+    <script>
+      const { degrees, PDFDocument, rgb, StandardFonts } = PDFLib;
+      let pdfDoc;
+
+      async function loadPdf() {
+        // Fetch an existing PDF document.
+        const url = "./demo.pdf";
+        const existingPdfBytes = await fetch(url).then((res) =>
+          res.arrayBuffer()
+        );
+
+        // Load a `PDFDocument` from the existing PDF bytes.
+        return await PDFDocument.load(existingPdfBytes);
+      }
+
+      async function saveAndRender(doc) {
+        // Serialize the `PDFDocument` to bytes (a `Uint8Array`).
+        const pdfBytes = await doc.save();
+
+        const pdfDataUri = await doc.saveAsBase64({ dataUri: true });
+        document.getElementById("pdf").src = pdfDataUri;
+      }
+
+      async function addPage() {
+        pdfDoc = await addPageToDoc(pdfDoc);
+        await saveAndRender(pdfDoc);
+      }
+
+      async function removePage() {
+        pdfDoc = await removePageToDoc(pdfDoc);
+        await saveAndRender(pdfDoc);
+      }
+
+      loadPdf().then((doc) => {
+        pdfDoc = doc;
+        return saveAndRender(pdfDoc);
+      });
+    </script>
+  </body>
+</html>
