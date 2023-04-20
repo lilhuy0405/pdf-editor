@@ -7,50 +7,126 @@
     <script src="https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js"></script>
     <script src="https://unpkg.com/pdf-lib"></script>
     <script src="https://unpkg.com/downloadjs@1.4.7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.5.141/build/pdf.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jspdf/1.3.3/jspdf.min.js"></script>
+
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.5.141/web/pdf_viewer.min.css"
+    />
     <title>Vite App</title>
   </head>
   <body>
+    <h1>PDF editor</h1>
     <div>
+      <button id="prev">pre</button>
+      <button id="next">next</button>
+      <button id="zoomIn">++</button>
+      <button id="zoomOut">--</button>
+      <button id="export">export</button>
+      <span
+        >Page: <span id="page_num"></span> / <span id="page_count"></span
+      ></span>
     </div>
-    <iframe id="pdf" style="width: 90%; height: 700px"></iframe>
+    <canvas id="editor" style="border: 1px solid #111"></canvas>
     <!-- <script type="module" src="/main.js"></script> -->
     <script>
-      const { degrees, PDFDocument, rgb, StandardFonts } = PDFLib;
-      let pdfDoc;
+      //static html
+      const prevBtn = document.getElementById("prev");
+      const nextBtn = document.getElementById("next");
+      const zoomInBtn = document.getElementById("zoomIn");
+      const zoomOutBtn = document.getElementById("zoomOut");
+      const pageNum = document.getElementById("page_num");
+      const pageCount = document.getElementById("page_count");
+      const exportBtn = document.getElementById("export");
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.5.141/pdf.worker.js";
+      //global variables
+      let pageNumber = 1;
+      let pageRendering = false;
+      let pageNumPending = null;
+      let scale = 1;
+      const canvas = document.getElementById("editor");
+      const ctx = canvas.getContext("2d");
 
-      async function loadPdf() {
-        // Fetch an existing PDF document.
-        const url = "/demo.pdf";
-        const existingPdfBytes = await fetch(url).then((res) =>
-          res.arrayBuffer()
-        );
-
-        // Load a `PDFDocument` from the existing PDF bytes.
-        return await PDFDocument.load(existingPdfBytes);
+      async function renderPage(pageNumber, doc) {
+        pageRendering = true;
+        const page = await doc.getPage(pageNumber);
+        const viewport = page.getViewport({ scale: scale });
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        const renderContext = {
+          canvasContext: ctx,
+          viewport: viewport,
+        };
+        const renderTask = page.render(renderContext);
+        await renderTask.promise;
+        pageRendering = false;
+        if (pageNumPending !== null) {
+          renderPage(pageNumPending, doc);
+          pageNumPending = null;
+        }
+        //update page number
+        pageNum.textContent = pageNumber;
       }
 
-      async function saveAndRender(doc) {
-        // Serialize the `PDFDocument` to bytes (a `Uint8Array`).
-        const pdfBytes = await doc.save();
-
-        const pdfDataUri = await doc.saveAsBase64({ dataUri: true });
-        document.getElementById("pdf").src = pdfDataUri;
+      function queueRenderPage(num, doc) {
+        if (pageRendering) {
+          pageNumPending = num;
+        } else {
+          renderPage(num, doc);
+        }
       }
 
-      async function addPage() {
-        pdfDoc = await addPageToDoc(pdfDoc);
-        await saveAndRender(pdfDoc);
+      function onPrevPage(pdfDoc) {
+        if (pageNumber <= 1) {
+          return;
+        }
+        pageNumber--;
+        queueRenderPage(pageNumber, pdfDoc);
       }
 
-      async function removePage() {
-        pdfDoc = await removePageToDoc(pdfDoc);
-        await saveAndRender(pdfDoc);
+      function onNextPage(pdfDoc) {
+        if (pageNumber >= pdfDoc.numPages) {
+          return;
+        }
+        pageNumber++;
+        queueRenderPage(pageNumber, pdfDoc);
       }
 
-      loadPdf().then((doc) => {
-        pdfDoc = doc;
-        return saveAndRender(pdfDoc);
-      });
+      async function getPdfDocument() {
+        const doc = await pdfjsLib.getDocument("demo.pdf").promise;
+        return doc;
+      }
+
+      async function main() {
+        const pdfDoc = await getPdfDocument();
+        const numPages = pdfDoc.numPages;
+        pageCount.textContent = numPages;
+        await renderPage(pageNumber, pdfDoc);
+        //allow draw on canvas using mouse
+      
+        //export canvas to pdf
+        exportBtn.addEventListener("click", async () => {
+          const pdf = new jsPDF("p", "pt", "a4");
+          const imgData = canvas.toDataURL("image/jpeg", 1.0);
+          pdf.addImage(imgData, "JPEG", 0, 0, canvas.width, canvas.height);
+          pdf.save("demo.pdf");
+        });
+
+        //bind events
+        prevBtn.addEventListener("click", () => onPrevPage(pdfDoc));
+        nextBtn.addEventListener("click", () => onNextPage(pdfDoc));
+        zoomInBtn.addEventListener("click", () => {
+          scale += 0.1;
+          renderPage(pageNumber, pdfDoc);
+        });
+        zoomOutBtn.addEventListener("click", () => {
+          scale -= 0.1;
+          renderPage(pageNumber, pdfDoc);
+        });
+      }
+      main();
     </script>
   </body>
 </html>
