@@ -14,11 +14,32 @@
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.5.141/web/pdf_viewer.min.css"
     />
+
+    <style>
+      #editor {
+        border: 2px dotted #cccccc;
+        border-radius: 15px;
+        cursor: crosshair;
+      }
+      .controller {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 20px;
+      }
+
+      .editor-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 20px;
+      }
+    </style>
     <title>Vite App</title>
   </head>
   <body>
     <h1>PDF editor</h1>
-    <div>
+    <div class="controller">
       <button id="prev">pre</button>
       <button id="next">next</button>
       <button id="zoomIn">++</button>
@@ -28,7 +49,9 @@
         >Page: <span id="page_num"></span> / <span id="page_count"></span
       ></span>
     </div>
-    <canvas id="editor" style="border: 1px solid #111"></canvas>
+    <div class="editor-container">
+      <canvas id="editor" style="border: 1px solid #111"></canvas>
+    </div>
     <!-- <script type="module" src="/main.js"></script> -->
     <script>
       //static html
@@ -105,7 +128,153 @@
         pageCount.textContent = numPages;
         await renderPage(pageNumber, pdfDoc);
         //allow draw on canvas using mouse
-      
+
+        window.requestAnimFrame = (function (callback) {
+          return (
+            window.requestAnimationFrame ||
+            window.webkitRequestAnimationFrame ||
+            window.mozRequestAnimationFrame ||
+            window.oRequestAnimationFrame ||
+            window.msRequestAnimaitonFrame ||
+            function (callback) {
+              window.setTimeout(callback, 1000 / 60);
+            }
+          );
+        })();
+
+        ctx.strokeStyle = "#222222";
+        ctx.lineWidth = 0.5;
+
+        var drawing = false;
+        var mousePos = {
+          x: 0,
+          y: 0,
+        };
+        var lastPos = mousePos;
+
+        canvas.addEventListener(
+          "mousedown",
+          function (e) {
+            drawing = true;
+            lastPos = getMousePos(canvas, e);
+          },
+          false
+        );
+
+        canvas.addEventListener(
+          "mouseup",
+          function (e) {
+            drawing = false;
+          },
+          false
+        );
+
+        canvas.addEventListener(
+          "mousemove",
+          function (e) {
+            mousePos = getMousePos(canvas, e);
+          },
+          false
+        );
+
+        // Add touch event support for mobile
+        canvas.addEventListener("touchstart", function (e) {}, false);
+
+        canvas.addEventListener(
+          "touchmove",
+          function (e) {
+            var touch = e.touches[0];
+            var me = new MouseEvent("mousemove", {
+              clientX: touch.clientX,
+              clientY: touch.clientY,
+            });
+            canvas.dispatchEvent(me);
+          },
+          false
+        );
+
+        canvas.addEventListener(
+          "touchstart",
+          function (e) {
+            mousePos = getTouchPos(canvas, e);
+            var touch = e.touches[0];
+            var me = new MouseEvent("mousedown", {
+              clientX: touch.clientX,
+              clientY: touch.clientY,
+            });
+            canvas.dispatchEvent(me);
+          },
+          false
+        );
+
+        canvas.addEventListener(
+          "touchend",
+          function (e) {
+            var me = new MouseEvent("mouseup", {});
+            canvas.dispatchEvent(me);
+          },
+          false
+        );
+
+        function getMousePos(canvasDom, mouseEvent) {
+          var rect = canvasDom.getBoundingClientRect();
+          return {
+            x: mouseEvent.clientX - rect.left,
+            y: mouseEvent.clientY - rect.top,
+          };
+        }
+
+        function getTouchPos(canvasDom, touchEvent) {
+          var rect = canvasDom.getBoundingClientRect();
+          return {
+            x: touchEvent.touches[0].clientX - rect.left,
+            y: touchEvent.touches[0].clientY - rect.top,
+          };
+        }
+
+        function renderCanvas() {
+          if (drawing) {
+            ctx.moveTo(lastPos.x, lastPos.y);
+            ctx.lineTo(mousePos.x, mousePos.y);
+            ctx.stroke();
+            lastPos = mousePos;
+          }
+        }
+
+        // Prevent scrolling when touching the canvas
+        document.body.addEventListener(
+          "touchstart",
+          function (e) {
+            if (e.target == canvas) {
+              e.preventDefault();
+            }
+          },
+          false
+        );
+        document.body.addEventListener(
+          "touchend",
+          function (e) {
+            if (e.target == canvas) {
+              e.preventDefault();
+            }
+          },
+          false
+        );
+        document.body.addEventListener(
+          "touchmove",
+          function (e) {
+            if (e.target == canvas) {
+              e.preventDefault();
+            }
+          },
+          false
+        );
+
+        (function drawLoop() {
+          requestAnimFrame(drawLoop);
+          renderCanvas();
+        })();
+
         //export canvas to pdf
         exportBtn.addEventListener("click", async () => {
           const pdf = new jsPDF("p", "pt", "a4");
